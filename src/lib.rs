@@ -5,6 +5,7 @@ pub struct Chunk<'a> {
     data: &'a [u8],
     max_chunk_size: usize,
     meta_size: usize,
+    pub status: ChunkStatus,
 }
 
 #[derive(Debug)]
@@ -17,7 +18,6 @@ pub struct ChunkStatus {
     pub number: Option<usize>,
     pub status: Option<ChunkSessionStatus>,
     pub retry: u8,
-    pub dst: [u8; 6],
 }
 
 #[derive(Debug)]
@@ -26,44 +26,40 @@ pub enum ChunkError {
     OverflowRetryCounter,
 }
 
-// impl ChunkStatus {
-//     pub fn new() -> Self {
-//         ChunkStatus {
-//             dst: esp_idf_svc::espnow::BROADCAST,
-//             ..Default::default()
-//         }
-//     }
+impl ChunkStatus {
+    pub fn new() -> Self {
+        ChunkStatus {
+            ..Default::default()
+        }
+    }
 
-//     pub fn to_send(&mut self, number: usize, dst: Option<[u8; 6]>) {
-//         self.number = Some(number);
-//         self.status = Some(ChunkSessionStatus::Sended);
-//         self.retry = 0;
-//         if let Some(dst) = dst {
-//             self.dst = dst;
-//         }
-//     }
+    pub fn to_send(&mut self, number: usize) {
+        self.number = Some(number);
+        self.status = Some(ChunkSessionStatus::Sended);
+        self.retry = 0;
+    }
 
-//     pub fn to_received(&mut self, number: usize) {
-//         if self.number != Some(number) {
-//             panic!(
-//                 "Invalid chunk number, current {}, received {}",
-//                 self.number.unwrap(),
-//                 number
-//             );
-//         }
-//         self.status = Some(ChunkSessionStatus::Received);
-//         self.retry = 0;
-//     }
+    pub fn to_received(&mut self, number: usize) {
+        if self.number != Some(number) {
+            panic!(
+                "Invalid chunk number, current {}, received {}",
+                self.number.unwrap(),
+                number
+            );
+        }
+        self.status = Some(ChunkSessionStatus::Received);
+        self.retry = 0;
+    }
 
-//     pub fn increase_retry(&mut self) -> Result<u8, ChunkError> {
-//         println!("<---Counter increase: {}", self.retry);
-//         if self.retry == u8::MAX {
-//             return Err(ChunkError::OverflowRetryCounter);
-//         }
-//         self.retry += 1;
-//         Ok(self.retry)
-//     }
-// }
+    pub fn increase_retry(&mut self) -> Result<u8, ChunkError> {
+        println!("<---Counter increase: {}", self.retry);
+        if self.retry == u8::MAX {
+            return Err(ChunkError::OverflowRetryCounter);
+        }
+        self.retry += 1;
+        Ok(self.retry)
+    }
+}
 
 impl<'a> Chunk<'a> {
     pub fn new(max_chunk_size: usize, topic: u8, data: &'a [u8]) -> Self {
@@ -73,6 +69,7 @@ impl<'a> Chunk<'a> {
             topic,
             max_chunk_size,
             meta_size: core::mem::size_of::<usize>(),
+            status: ChunkStatus::new(),
         }
     }
 
@@ -126,13 +123,6 @@ impl<'a> Chunk<'a> {
         self.get_pointer(counter.unwrap_or(self.counter) + 1)
     }
 
-    // fn meta(&self, counter: Option<usize>) -> Vec<u8> {
-    //     let meta = counter.unwrap_or(self.counter).to_le_bytes().to_vec();
-    //     let mut meta = vec![0; self.meta_size - meta.len()];
-    //     meta.extend_from_slice(&meta);
-    //     meta
-    // }
-
     pub fn chunk(&self, counter: Option<usize>) -> Option<(&'a [u8], usize)> {
         let start = self.start(counter);
         if start > self.data.len() {
@@ -170,6 +160,8 @@ mod tests {
         let chunk = Chunk::new(250, 0x10, &data);
         let mut iter = chunk.into_iter();
         assert_eq!(iter.next().unwrap().0.len() + core::mem::size_of::<usize>() * 2 + 1, 250);
+        assert_eq!(iter.next().unwrap().0.len() + core::mem::size_of::<usize>(), 250);
+        assert_eq!(iter.next().unwrap().0.len() + core::mem::size_of::<usize>(), 250);
     }
 
     #[test]
