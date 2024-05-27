@@ -16,7 +16,7 @@ pub enum ChunkSessionStatus {
 #[derive(Default, Debug)]
 pub struct ChunkStatus {
     pub number: Option<usize>,
-    pub status: Option<ChunkSessionStatus>,
+    pub session: Option<ChunkSessionStatus>,
     pub retry: u8,
 }
 
@@ -35,7 +35,7 @@ impl ChunkStatus {
 
     pub fn to_send(&mut self, number: usize) {
         self.number = Some(number);
-        self.status = Some(ChunkSessionStatus::Sended);
+        self.session = Some(ChunkSessionStatus::Sended);
         self.retry = 0;
     }
 
@@ -47,7 +47,7 @@ impl ChunkStatus {
                 number
             );
         }
-        self.status = Some(ChunkSessionStatus::Received);
+        self.session = Some(ChunkSessionStatus::Received);
         self.retry = 0;
     }
 
